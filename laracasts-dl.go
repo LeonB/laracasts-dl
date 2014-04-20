@@ -41,6 +41,7 @@ func parse_options() config {
 }
 
 func main() {
+	// Check if username, password and directory (opt) is set
 	config := parse_options()
 	scraper := NewScraper(config)
 
@@ -52,6 +53,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Find all lessons from /all
 	lessons, err := scraper.GetAvailableLessons()
 	log.Printf("Found %v lessons", len(lessons))
 
@@ -59,9 +61,13 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Loop all lessons and download them
 	for i, lesson := range lessons {
-		log.Printf("Downloading lesson %v/%v (%v)", i+1, len(lessons), lesson.Name)
+		log.Printf("Checking lesson %v/%v (%v)", i+1, len(lessons), lesson.Name)
 		err = scraper.DownloadLesson(lesson)
+		if err != nil {
+			log.Printf("skiping: %v", err)
+		}
 	}
 }
 
@@ -86,6 +92,7 @@ type Lesson struct {
 	Url  string
 }
 
+// Determine what the proper filename for a lesson should be
 func (l *Lesson) GetFilename(contentType string) (string, error) {
 	pieces := strings.Split(l.Url, "/")
 	basename := pieces[len(pieces)-1]
@@ -93,7 +100,7 @@ func (l *Lesson) GetFilename(contentType string) (string, error) {
 	pieces = strings.Split(contentType, "/")
 	extension := pieces[len(pieces)-1]
 
-	return basename + "." + extension, nil
+	return fmt.Sprintf("%v-%v.%v", strconv.Itoa(l.Id), basename, extension), nil
 }
 
 func NewScraper(config config) scraper {
@@ -111,6 +118,8 @@ func NewScraper(config config) scraper {
 	return s
 }
 
+// Find all lesson on /all
+// To get the lessonId you have to be logged in
 func (s *scraper) GetAvailableLessons() ([]Lesson, error) {
 	episodes := []Lesson{}
 
@@ -122,11 +131,14 @@ func (s *scraper) GetAvailableLessons() ([]Lesson, error) {
 	}
 
 	doc, err := goquery.NewDocumentFromResponse(resp)
+
+	// Find all links to lessons
 	links := doc.Find(".container a[href*='/lessons/']")
 	links.Each(func(i int, s *goquery.Selection) {
 		href, _ := s.Attr("href")
 		name, _ := s.Html()
 
+		// Find the lessonId
 		p := s.Parent()
 		input := p.Find("[name='lesson-id']")
 		str, _ := input.Attr("value")
@@ -143,6 +155,7 @@ func (s *scraper) GetAvailableLessons() ([]Lesson, error) {
 	return episodes, nil
 }
 
+// Login to laracasts
 func (s *scraper) Login() error {
 	u := s.BaseUrl + "/sessions"
 	resp, err := s.Client.PostForm(u,
@@ -161,6 +174,7 @@ func (s *scraper) Login() error {
 	return nil
 }
 
+// Download a specific lesson and put it in a directory
 func (s *scraper) DownloadLesson(lesson Lesson) error {
 	url := s.BaseUrl + "/downloads/" + strconv.Itoa(lesson.Id) + "?type=lesson"
 
@@ -174,20 +188,34 @@ func (s *scraper) DownloadLesson(lesson Lesson) error {
 
 	headers := resp.Header
 	filename, err := lesson.GetFilename(headers["Content-Type"][0])
-	filename = s.Directory + "/" + filename
+	path := s.Directory + "/" + filename
+
+	// Open the destination, return an error when the file already exists
+	dest, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	defer dest.Close()
+
+	if err != nil {
+		// Nog a "already exists" error: blow up
+		if !os.IsExist(err) {
+			log.Fatal(err)
+		}
+
+		// OpenFile() + os.O_EXCL doesn't return a File
+		dest, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
+		defer dest.Close()
+
+		// Check if the video sizes online and local are the same
+		fileInfo, _ := dest.Stat()
+		if (fileInfo.Size() == resp.ContentLength) {
+			return fmt.Errorf("%v already exists (and is the same size)", filename)
+		}
+		return nil
+	}
 
 	// Create new progressbar
 	bar := pb.New(int(resp.ContentLength)).SetUnits(pb.U_BYTES)
 	bar.ShowSpeed = true
 	bar.Start()
-
-	// TODO: check file existence first with io.IsExist
-	dest, err := os.Create(filename)
-	if err != nil {
-		log.Println("Error while creating", filename, "-", err)
-		return nil
-	}
-	defer dest.Close()
 
 	// create multi writer
 	writer := io.MultiWriter(dest, bar)
