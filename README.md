@@ -45,4 +45,5 @@ Downloading lesson 10/148 (How to use Eloquent Outside of Laravel)
 Downloading lesson 11/148 (Form Macros for the Win)
 50.83 MB / 83.88 MB [=================>-----------------] 60.60 % 2.98 MB/s 11s
 ```
-:w
+
+[![screenshot](https://github.com/LeonB/laracasts-dl/raw/master/screenshot.png)](https://github.com/LeonB/laracasts-dl/raw/master/screenshot.png)
