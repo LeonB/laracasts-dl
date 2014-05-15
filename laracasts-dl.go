@@ -21,7 +21,7 @@ func usage() {
 	log.Fatal(banner)
 }
 
-func parse_options() config {
+func parseOptions() config {
 	if len(os.Args) < 3 {
 		usage()
 	}
@@ -42,8 +42,8 @@ func parse_options() config {
 
 func main() {
 	// Check if username, password and directory (opt) is set
-	config := parse_options()
-	scraper := NewScraper(config)
+	config := parseOptions()
+	scraper := newScraper(config)
 
 	// First login to get more data in views
 	log.Println("Logging in")
@@ -79,33 +79,33 @@ type config struct {
 
 type scraper struct {
 	// Name string
-	BaseUrl string
+	BaseURL string
 	Client  http.Client
 	Username string
 	Password string
 	Directory string
 }
 
-type Lesson struct {
-	Id   int
+type lesson struct {
+	ID   int
 	Name string
-	Url  string
+	URL  string
 }
 
 // Determine what the proper filename for a lesson should be
-func (l *Lesson) GetFilename(contentType string) (string, error) {
-	pieces := strings.Split(l.Url, "/")
+func (l *lesson) GetFilename(contentType string) (string, error) {
+	pieces := strings.Split(l.URL, "/")
 	basename := pieces[len(pieces)-1]
 
 	pieces = strings.Split(contentType, "/")
 	extension := pieces[len(pieces)-1]
 
-	return fmt.Sprintf("%v-%v.%v", strconv.Itoa(l.Id), basename, extension), nil
+	return fmt.Sprintf("%v-%v.%v", strconv.Itoa(l.ID), basename, extension), nil
 }
 
-func NewScraper(config config) scraper {
+func newScraper(config config) scraper {
 	s := scraper{}
-	s.BaseUrl = "https://laracasts.com"
+	s.BaseURL = "https://laracasts.com"
 
 	s.Username = config.Username
 	s.Password = config.Password
@@ -119,11 +119,11 @@ func NewScraper(config config) scraper {
 }
 
 // Find all lesson on /all
-// To get the lessonId you have to be logged in
-func (s *scraper) GetAvailableLessons() ([]Lesson, error) {
-	episodes := []Lesson{}
+// To get the lessonID you have to be logged in
+func (s *scraper) GetAvailableLessons() ([]lesson, error) {
+	episodes := []lesson{}
 
-	url := s.BaseUrl + "/all"
+	url := s.BaseURL + "/all"
 	resp, err := s.Client.Get(url)
 
 	if err != nil {
@@ -138,15 +138,15 @@ func (s *scraper) GetAvailableLessons() ([]Lesson, error) {
 		href, _ := s.Attr("href")
 		name, _ := s.Html()
 
-		// Find the lessonId
+		// Find the lessonID
 		p := s.Parent()
 		input := p.Find("[name='lesson-id']")
 		str, _ := input.Attr("value")
-		lessonId, _ := strconv.Atoi(str)
+		lessonID, _ := strconv.Atoi(str)
 
-		lesson := Lesson{}
-		lesson.Id = lessonId
-		lesson.Url = href
+		lesson := lesson{}
+		lesson.ID = lessonID
+		lesson.URL = href
 		lesson.Name = name
 
 		episodes = append(episodes, lesson)
@@ -157,7 +157,7 @@ func (s *scraper) GetAvailableLessons() ([]Lesson, error) {
 
 // Login to laracasts
 func (s *scraper) Login() error {
-	u := s.BaseUrl + "/sessions"
+	u := s.BaseURL + "/sessions"
 	resp, err := s.Client.PostForm(u,
 		url.Values{"email": {s.Username}, "password": {s.Password}})
 	defer resp.Body.Close()
@@ -167,7 +167,7 @@ func (s *scraper) Login() error {
 	}
 
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("Login return wrong status code: %v, expected %v. Is your username/password correct?",
+		return fmt.Errorf("login return wrong status code: %v, expected %v. Is your username/password correct?",
 			resp.StatusCode, 200)
 	}
 
@@ -175,8 +175,8 @@ func (s *scraper) Login() error {
 }
 
 // Download a specific lesson and put it in a directory
-func (s *scraper) DownloadLesson(lesson Lesson) error {
-	url := s.BaseUrl + "/downloads/" + strconv.Itoa(lesson.Id) + "?type=lesson"
+func (s *scraper) DownloadLesson(lesson lesson) error {
+	url := s.BaseURL + "/downloads/" + strconv.Itoa(lesson.ID) + "?type=lesson"
 
 	resp, err := s.Client.Get(url)
 	defer resp.Body.Close()
