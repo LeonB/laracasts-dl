@@ -139,7 +139,7 @@ func (s *scraper) GetAvailableLessons() ([]lesson, error) {
 		name, _ := s.Html()
 
 		// Find the lessonID
-		p := s.Parent()
+		p := s.ParentsFiltered("li")
 		input := p.Find("[name='lesson-id']")
 		str, _ := input.Attr("value")
 		lessonID, _ := strconv.Atoi(str)
