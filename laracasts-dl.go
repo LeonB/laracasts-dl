@@ -90,12 +90,19 @@ type lesson struct {
 	ID   int
 	Name string
 	URL  string
+	Type string
 }
 
 // Determine what the proper filename for a lesson should be
 func (l *lesson) GetFilename(contentType string) (string, error) {
+	basename := ""
 	pieces := strings.Split(l.URL, "/")
-	basename := pieces[len(pieces)-1]
+
+	if l.Type == "episode" {
+		basename = pieces[len(pieces)-3]
+	} else {
+		basename = pieces[len(pieces)-1]
+	}
 
 	pieces = strings.Split(contentType, "/")
 	extension := pieces[len(pieces)-1]
@@ -133,7 +140,7 @@ func (s *scraper) GetAvailableLessons() ([]lesson, error) {
 	doc, err := goquery.NewDocumentFromResponse(resp)
 
 	// Find all links to lessons
-	links := doc.Find(".container a[href*='/lessons/']")
+	links := doc.Find(".container a.js-lesson-title")
 	links.Each(func(i int, s *goquery.Selection) {
 		href, _ := s.Attr("href")
 		name, _ := s.Html()
@@ -143,11 +150,15 @@ func (s *scraper) GetAvailableLessons() ([]lesson, error) {
 		input := p.Find("[name='lesson-id']")
 		str, _ := input.Attr("value")
 		lessonID, _ := strconv.Atoi(str)
+		typ, _ := p.Find("[name='type']").Attr("value")
+		typ = strings.ToLower(typ)
+		typ = strings.Replace(typ, "laracasts\\", "", -1)
 
 		lesson := lesson{}
 		lesson.ID = lessonID
 		lesson.URL = href
 		lesson.Name = name
+		lesson.Type = typ
 
 		episodes = append(episodes, lesson)
 	})
@@ -176,7 +187,7 @@ func (s *scraper) Login() error {
 
 // Download a specific lesson and put it in a directory
 func (s *scraper) DownloadLesson(lesson lesson) error {
-	url := s.BaseURL + "/downloads/" + strconv.Itoa(lesson.ID) + "?type=lesson"
+	url := s.BaseURL + "/downloads/" + strconv.Itoa(lesson.ID) + "?type=" + lesson.Type
 
 	resp, err := s.Client.Get(url)
 	defer resp.Body.Close()
@@ -188,6 +199,7 @@ func (s *scraper) DownloadLesson(lesson lesson) error {
 
 	headers := resp.Header
 	filename, err := lesson.GetFilename(headers["Content-Type"][0])
+	log.Println(filename)
 	path := s.Directory + "/" + filename
 
 	// Open the destination, return an error when the file already exists
@@ -211,6 +223,19 @@ func (s *scraper) DownloadLesson(lesson lesson) error {
 		}
 		return nil
 	}
+
+	// log.Println("Starting downloading", url, "-", err)
+
+	// if (true) {
+	// 	_, err := io.Copy(dest, resp.Body)
+	// 	if err != nil {
+
+	// 		log.Println("Error while downloading", url, "-", err)
+	// 		return nil
+	// 	}
+
+	// 	return nil
+	// }
 
 	// Create new progressbar
 	bar := pb.New(int(resp.ContentLength)).SetUnits(pb.U_BYTES)
