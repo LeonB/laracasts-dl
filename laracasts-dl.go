@@ -131,37 +131,58 @@ func (s *scraper) GetAvailableLessons() ([]lesson, error) {
 	episodes := []lesson{}
 
 	url := s.BaseURL + "/all"
-	resp, err := s.Client.Get(url)
 
-	if err != nil {
-		return nil, err
+	emptyPage := false
+
+	page := 1
+
+	for emptyPage == false {
+
+		pageUrl := url + "?page=" + strconv.Itoa(page)
+
+		resp, err := s.Client.Get(pageUrl)
+
+		if err != nil {
+			return nil, err
+		}
+
+		doc, err := goquery.NewDocumentFromResponse(resp)
+
+		numLinks := 0
+
+		// Find all links to lessons
+		links := doc.Find(".container a.js-lesson-title")
+		links.Each(func(i int, s *goquery.Selection) {
+			href, _ := s.Attr("href")
+			name, _ := s.Html()
+
+			// Find the lessonID
+			p := s.ParentsFiltered("li")
+			input := p.Find("[name='lesson-id']")
+			str, _ := input.Attr("value")
+			lessonID, _ := strconv.Atoi(str)
+			typ, _ := p.Find("[name='type']").Attr("value")
+			typ = strings.ToLower(typ)
+			typ = strings.Replace(typ, "laracasts\\", "", -1)
+
+			lesson := lesson{}
+			lesson.ID = lessonID
+			lesson.URL = href
+			lesson.Name = name
+			lesson.Type = typ
+
+			episodes = append(episodes, lesson)
+
+			numLinks = numLinks + 1
+		})
+
+		if numLinks == 0 {
+			emptyPage = true
+		}
+
+		page = page + 1
 	}
-
-	doc, err := goquery.NewDocumentFromResponse(resp)
-
-	// Find all links to lessons
-	links := doc.Find(".container a.js-lesson-title")
-	links.Each(func(i int, s *goquery.Selection) {
-		href, _ := s.Attr("href")
-		name, _ := s.Html()
-
-		// Find the lessonID
-		p := s.ParentsFiltered("li")
-		input := p.Find("[name='lesson-id']")
-		str, _ := input.Attr("value")
-		lessonID, _ := strconv.Atoi(str)
-		typ, _ := p.Find("[name='type']").Attr("value")
-		typ = strings.ToLower(typ)
-		typ = strings.Replace(typ, "laracasts\\", "", -1)
-
-		lesson := lesson{}
-		lesson.ID = lessonID
-		lesson.URL = href
-		lesson.Name = name
-		lesson.Type = typ
-
-		episodes = append(episodes, lesson)
-	})
+	
 
 	return episodes, nil
 }
