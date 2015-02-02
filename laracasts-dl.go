@@ -27,8 +27,8 @@ func parseOptions() config {
 	}
 
 	config := config{
-		Username:  os.Args[1],
-		Password:  os.Args[2],
+		Username: os.Args[1],
+		Password: os.Args[2],
 	}
 
 	if len(os.Args) > 3 {
@@ -79,10 +79,10 @@ type config struct {
 
 type scraper struct {
 	// Name string
-	BaseURL string
-	Client  http.Client
-	Username string
-	Password string
+	BaseURL   string
+	Client    http.Client
+	Username  string
+	Password  string
 	Directory string
 }
 
@@ -182,7 +182,6 @@ func (s *scraper) GetAvailableLessons() ([]lesson, error) {
 
 		page = page + 1
 	}
-	
 
 	return episodes, nil
 }
@@ -239,7 +238,7 @@ func (s *scraper) DownloadLesson(lesson lesson) error {
 
 		// Check if the video sizes online and local are the same
 		fileInfo, _ := dest.Stat()
-		if (fileInfo.Size() == resp.ContentLength) {
+		if fileInfo.Size() == resp.ContentLength {
 			return fmt.Errorf("%v already exists (and is the same size)", filename)
 		}
 		return nil
